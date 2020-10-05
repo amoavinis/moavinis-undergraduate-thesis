@@ -23,15 +23,15 @@ ticker = 'BTC-EUR'
 print(ticker)
 
 # Setting the CUDA device to run the script on
-device = 'cuda:1'
+device = 'cuda:0'
 print(device)
 
 # Batch size
 BATCH_SIZE = 32
 
-# Use financial data and textual data
-only_financial = True
-only_textual = True
+# Use financial data and/or textual data
+do_financial = False
+do_textual = True
 
 # Financial data will be used from the last 7 days, Twitter data from the last day
 stock_step = 7
@@ -49,11 +49,11 @@ range_len = end - start
 range_len = range_len.days + 1
 
 # For each day
-ranges = []
+dates = []
 for i in range(range_len):
-    # Calculate starting datetime and ending datetime to search in tweets database
+    # Calculate datetimes to search in tweets database
     date = start + datetime.timedelta(days=i)
-    ranges.append(date-datetime.timedelta(days=1))
+    dates.append(date-datetime.timedelta(days=1))
 
 # Financial data loader
 financial_data = Load_financial_data(ticker,
@@ -83,7 +83,7 @@ NUM_TWEETS = 1000
 
 print(str(method))
 f.write(str(method)+'\n')
-if method!='word2vec' and method!='bert' and method!='vader' and method!=None:
+if method!='word2vec' and method!='bert' and method!='vader':
     print("Specify a text processing model.")
     exit()
 
@@ -92,11 +92,11 @@ lstm_dim = 120
 # Initializing models
 stock_model = LSTM(input_dim=stock_step, hidden_dim=lstm_dim, output_dim=6,
                    num_layers=1, device=device).to(device)
-fc = Dense(only_financial, only_textual, lstm_dim, text_dim, 120, mode=method, device=device).to(device)
+fc = Dense(do_financial, do_textual, lstm_dim, mode=method, device=device).to(device)
 
 print("Getting tweets into RAM...")
 # Initialize Tweets data loader
-if only_textual:
+if do_textual:
     tweets_loader = Load_twitter_data(NUM_TWEETS, method=method, device=device)
 else:
     tweets_loader = Load_twitter_data(NUM_TWEETS, method=None, device=device)
@@ -154,10 +154,11 @@ for epoch in range(n_epochs):
         optimizer1.zero_grad()
         optimizer2.zero_grad()
         
+        # Getting average embeddings
         text_outputs = []
-        if only_textual:
+        if do_textual:
             for i in range(x_batch.size(0)):
-                tweets = tweets_loader.get_embeddings(ranges[pointer])
+                tweets = tweets_loader.get_embeddings(dates[pointer])
                 pointer += 1
                 if len(tweets)==0:
                     tweets = torch.zeros(text_dim).to(device)
@@ -211,10 +212,11 @@ for epoch in range(n_epochs):
             x_batch = x_batch.view(x_batch.shape[0], x_batch.shape[1], x_batch.shape[2]).to(device)
             y_batch = y_batch.view(y_batch.shape[0]).to(device)
             
+            # Getting average embeddings
             text_outputs = []
-            if only_textual:
+            if do_textual:
                 for i in range(x_batch.size(0)):
-                    tweets = tweets_loader.get_embeddings(ranges[pointer])
+                    tweets = tweets_loader.get_embeddings(dates[pointer])
                     pointer += 1
                     if len(tweets)==0:
                         tweets = torch.zeros(text_dim).to(device)

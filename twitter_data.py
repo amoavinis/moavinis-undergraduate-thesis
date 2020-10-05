@@ -12,7 +12,7 @@ class Load_twitter_data():
     def __init__(self, num_tweets, method=None, device='cpu'):
         self.data_twitter = dict()
         if method != None:
-            self.data_twitter = pickle.load(open(method+".p", "rb"))
+            self.data_twitter = pickle.load(open("pickle/"+method+".p", "rb"))
         self.num_tweets = num_tweets
         self.method = method
         self.device = device   
@@ -24,6 +24,7 @@ class Load_twitter_data():
         unix = int((date-datetime.date(1970, 1, 1)).days)
         day_tweets = random.sample(self.data_twitter[unix], min(self.num_tweets, len(self.data_twitter[unix])))
         day_tweets = torch.tensor(day_tweets)
+        # Average tweet embeddings
         day_tweets = torch.mean(day_tweets, 0)
 
         return day_tweets

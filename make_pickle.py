@@ -45,9 +45,9 @@ class PreProcessTweets:
 BERT_MODEL = 'bert-base-uncased'
 tokenizer = BertTokenizer.from_pretrained(BERT_MODEL, do_lower_case=True)
 
-method = "word2vec"
+method = "bert"
 print(method)
-device = "cuda:3"
+device = "cuda:0"
 path = "data/tweets.csv"
 
 bert = BERT(BERT_MODEL, device).to(device)
@@ -62,14 +62,13 @@ vader = SentimentIntensityAnalyzer()
 # Convert tweet to BERT or Word2Vec embedding
 def convert_to_embedding(sentence):
     if method=='bert':
-        #bert_sent = torch.tensor(sentence).view(1, -1)
         bert_sent = bert(sentence.to(device))
         return bert_sent.tolist()
 
     elif method=='word2vec':
         total = numpy.zeros(300)
         words = 0
-        # Averages all outputs for each word. If word has no representation in Word2Vec then an all-zero vector is used to represent it
+        # Averages all outputs for each word. If word has no representation in Word2Vec then nothing is added to `total`
         for w in word_tokenize(sentence):
             try:
                 total += word2vec[w]
@@ -101,10 +100,11 @@ with open(path, 'r', encoding='utf-8') as file:
             continue
         # Not all rows had 9 columns, but most had, so this was added as exception prevention
         if len(row)==9:
-            # Datetimes are converted into UNIX timestamp
+            # Datetimes are converted into UNIX day
             date_str = row[4].split()[0]
             unix = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()-datetime.date(1970, 1, 1)    
-            unix = int(unix.days)       
+            unix = int(unix.days)
+            # Only for the dates that the study is working with, for disk space reasons 
             if unix<17136 or unix>17927:
                 continue
             if count%100000 == 0:
@@ -115,6 +115,7 @@ with open(path, 'r', encoding='utf-8') as file:
             if len(tweet.strip())==0:
                 tweet = 'empty tweet'
             if method=='bert':
+                # Max size of tokens is 40
                 tokens = tokenizer.tokenize(tweet)
                 tweet = tokenizer.convert_tokens_to_ids(["[CLS]"] + tokens + ["[SEP]"])
                 if len(tweet)<=40:
@@ -131,6 +132,7 @@ print('loaded in ram')
 K = len(list(d.keys()))
 k = 0
 for i in d:
+    # Print progress
     print(100*k/K)
     k += 1
     if method=='bert':
@@ -144,5 +146,6 @@ for i in d:
         d[i] = [convert_to_embedding(j) for j in d[i]]
 print('calculated embeddings')
 
-pickle.dump(d, open(method+".p", "wb"), protocol=4)
+# Write in pickle file
+pickle.dump(d, open("pickle/"+method+".p", "wb"), protocol=4)
 
